@@ -5,6 +5,9 @@ import speech_recognition as sr
 import datetime
 import time
 import random  # Added for human-like delays
+from google import genai as client
+import os
+import warnings
 import undetected_chromedriver as uc  # The "Stealth" Driver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -38,43 +41,93 @@ def takeCommand():
         return "none"
     return query.lower()
 
+from google import genai
+
+# 1. Use the standard client initialization
+MODEL_NAME = "gemini-3-flash-preview"
+client = genai.Client(api_key="AIzaSyCvt7KYnPKJSgB-PjH16uCqAeRrsxWFv3A")
+
+def summarize_with_gemini(messy_text):
+    # Cleaning the text helps prevent "Token Vomit" errors
+    clean_text = " ".join(messy_text[:3000].split())
+    
+    # Try the request with a simple retry loop for 2026 stability
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=f"Jarvis, summarize this into 3 professional sentences for your master: {clean_text}"
+            )
+            return response.text
+        except Exception as e:
+            if "429" in str(e):
+                print("Rate limit hit, retrying in 2 seconds...")
+                time.sleep(2)
+            elif "503" in str(e) or "500" in str(e):
+                print("Google server issue, retrying...")
+                time.sleep(1)
+            else:
+                print(f"Gemini error: {e}")
+                break
+                
+    return "Sir, my neural link is experiencing high latency. I suggest reading the screen for now."
 # 4. STEALTH SEARCH LOGIC
+
+
 def search_google(query):
+    # This silences the annoying 'ResourceWarning' from the console
+    warnings.filterwarnings("ignore", category=ResourceWarning)
+    
     speak(f"Searching for {query} on Google...")
     
-    # Using undetected_chromedriver to hide from Google's bot detector
     options = uc.ChromeOptions()
-    driver = uc.Chrome(options=options)
+    # We use a persistent profile to look more 'human' to Google
+    driver = uc.Chrome(options=options, use_subprocess=False) 
     
-    # Wait a random amount of time to look human
-    time.sleep(random.uniform(1, 3))
-    driver.get(f"https://www.google.com/search?q={query}")
-    
-    wait = WebDriverWait(driver, 15)
     try:
-        # Looking for the main result container
-        result = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div#search")))
-        speak("Here is what I found, sir.")
-        # Only reading the top snippet so it's not too long
-        speak(result.text[:300]) 
-    except:
-        speak("I found the results, but they are protected by a security check. Please check the browser.")
+        driver.get(f"https://www.google.com/search?q={query}")
+        wait = WebDriverWait(driver, 15)
+        
+        # 2026-safe selector: Looking for the main result text
+        result_element = wait.until(EC.presence_of_element_located((By.ID, "search")))
+        raw_text = result_element.text[:2500]
+        
+        speak("I have the results, sir. Sending to Gemini for analysis.")
+        
+        # Now pass it to your Gemini function
+        summary = summarize_with_gemini(raw_text)
+        speak(summary)
+        
+    except Exception as e:
+        print(f"Operational Error: {e}")
+        speak("Sir, I found the data, but my connection to the browser was interrupted.")
+        
+    finally:
+        # The 'WinError 6' fix: We force a close and catch the error if it fails
+        try:
+            driver.close()
+            time.sleep(0.5)
+            driver.quit()
+        except OSError:
+            # This 'eats' the WinError 6 so it doesn't crash your main Jarvis loop
+            pass
 
-def play_youtube(song):
-    speak(f"Searching for {song} on YouTube")
-    driver = uc.Chrome()
-    driver.get(f"https://www.youtube.com/results?search_query={song}")
+def play_youtube(video_query):
+    speak(f"Playing {video_query} on YouTube...")
+    options = uc.ChromeOptions()
+    driver = uc.Chrome(options=options, use_subprocess=False)
     
-    wait = WebDriverWait(driver, 15)
     try:
-        # Standard selector for the first video title
-        video = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "ytd-video-renderer a#video-title")))
-        time.sleep(random.uniform(1, 2)) # Human-like pause before clicking
+        driver.get(f"https://www.youtube.com/results?search_query={video_query}")
+        wait = WebDriverWait(driver, 15)
+        
+        # Click the first video result
+        video = wait.until(EC.element_to_be_clickable((By.ID, "video-title")))
         video.click()
-        speak("Video started, sir.")
-    except:
-        speak("I found the results, but I am unable to click the video.")
-
+        
+    except Exception as e:
+        print(f"Error playing YouTube: {e}")
+        speak("Sir, I encountered an issue while trying to play the song.")
 # --- MAIN EXECUTION LOOP ---
 if __name__ == "__main__":
     speak("System initializing... All drivers online. I am ready, sir.")
@@ -90,10 +143,10 @@ if __name__ == "__main__":
             speak(f"Sir, the time is {strTime}")
 
         elif 'play' in query:
-            song = query.replace('play', '').strip()
-            play_youtube(song)
+            video_query = query.replace('play', '').strip()
+            play_youtube(video_query)
           
-        elif "search" in query:
+        elif "search" in query or "what" in query or "who" in query or "how" in query or "why" in query or "when" in query:
             search_query = query.replace("search", "").strip()
             search_google(search_query)
 

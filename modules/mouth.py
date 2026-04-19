@@ -1,0 +1,25 @@
+import pyttsx3
+import time
+
+def speak(audio):
+    print(f"Jarvis: {audio}")
+    # Initialize inside the function to avoid thread-locking
+    engine = pyttsx3.init()
+    
+    # Optional: Set voice properties
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice', voices[0].id) 
+    engine.setProperty('rate', 170)
+
+    
+    print("--- DEBUG: Audio Engine Start ---")
+    engine.say(audio)
+    engine.runAndWait()
+    print("--- DEBUG: Audio Engine Finished ---")
+
+    engine.say(audio)
+    engine.runAndWait()
+    
+    # Mandatory cleanup to release the audio driver
+    engine.stop()
+    time.sleep(0.1)

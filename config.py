@@ -1,0 +1,4 @@
+# config.py
+GEMINI_KEY = "AIzaSyC9QALpILjN4VSyM66lbGihFbY5Rv5D0JQ"
+VOICE_RATE = 170
+

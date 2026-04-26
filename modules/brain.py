@@ -1,17 +1,16 @@
 # modules/brain.py
 from google import genai
 
+def summarize(raw_data, api_key):
+    # If this fails, the key wasn't passed from main.py
+    if not api_key or api_key == "":
+        return "Sir, the Gemini API key is missing from my configuration."
 
-
-
-def summarize(messy_text, api_key):
     client = genai.Client(api_key=api_key)
-    try:
-        # gemini-3-flash-preview is the recommended 2026 free model
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview", 
-            contents=f"Jarvis, summarize this search data into 3 conversational sentences: {messy_text}"
-        )
-        return response.text
-    except Exception as e:
-        return f"Sir, I couldn't process the summary. Error: {e}"
+    
+    # Rest of your generation logic...
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=f"Summarize this for a voice assistant: {raw_data}"
+    )
+    return response.text
